@@ -223,6 +223,30 @@ export class DbManager {
     }
     return {};
   }
+
+  // ---------- 系统日志 ----------
+  async addSystemLog(
+    level: string,
+    message: string,
+    details?: any
+  ): Promise<void> {
+    if (typeof (this.storage as any).addSystemLog === 'function') {
+      await (this.storage as any).addSystemLog(level, message, details);
+    }
+  }
+
+  async getSystemLogs(): Promise<any[]> {
+    if (typeof (this.storage as any).getSystemLogs === 'function') {
+      return (this.storage as any).getSystemLogs();
+    }
+    return [];
+  }
+
+  async clearSystemLogs(): Promise<void> {
+    if (typeof (this.storage as any).clearSystemLogs === 'function') {
+      await (this.storage as any).clearSystemLogs();
+    }
+  }
 }
 
 // 导出默认实例

@@ -362,6 +362,34 @@ export class RedisStorage implements IStorage {
 
     return configs;
   }
+
+  // --- 系统日志 ---
+  async addSystemLog(
+    level: string,
+    message: string,
+    details?: any
+  ): Promise<void> {
+    const log = {
+      id: Math.random().toString(36).substring(2),
+      time: Math.floor(Date.now() / 1000),
+      level,
+      message,
+      details,
+    };
+    await withRetry(() => this.client.lPush('sys:logs', JSON.stringify(log)));
+    await withRetry(() => this.client.lTrim('sys:logs', 0, 99)); // Keep only latest 100 logs
+  }
+
+  async getSystemLogs(): Promise<any[]> {
+    const logsStr = await withRetry(() =>
+      this.client.lRange('sys:logs', 0, 99)
+    );
+    return logsStr.map((str) => JSON.parse(str));
+  }
+
+  async clearSystemLogs(): Promise<void> {
+    await withRetry(() => this.client.del('sys:logs'));
+  }
 }
 
 // 单例 Redis 客户端

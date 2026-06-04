@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import { API_CONFIG, ApiSite, getConfig } from '@/lib/config';
+import { db } from '@/lib/db';
 import { SearchResult } from '@/lib/types';
 import { cleanHtmlTags } from '@/lib/utils';
 
@@ -29,6 +31,11 @@ export async function searchFromApi(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+    // 异步记录并不阻塞主线程
+    db.addSystemLog('info', `[API Search] Fetching from ${apiSite.name}`, {
+      url: apiUrl,
+    }).catch(() => {});
+
     const response = await fetch(apiUrl, {
       headers: API_CONFIG.search.headers,
       signal: controller.signal,
@@ -37,6 +44,10 @@ export async function searchFromApi(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      db.addSystemLog('warn', `[API Search] Failed for ${apiSite.name}`, {
+        status: response.status,
+        url: apiUrl,
+      }).catch(() => {});
       return [];
     }
 
@@ -202,8 +213,15 @@ export async function searchFromApi(
       });
     }
 
+    db.addSystemLog('info', `[API Search] Success for ${apiSite.name}`, {
+      itemsCount: results.length,
+      query,
+    }).catch(() => {});
     return results;
   } catch (error) {
+    db.addSystemLog('error', `[API Search] Exception for ${apiSite.name}`, {
+      error: String(error),
+    }).catch(() => {});
     return [];
   }
 }
@@ -221,6 +239,10 @@ export async function getDetailFromApi(
 
   const detailUrl = `${apiSite.api}${API_CONFIG.detail.path}${id}`;
 
+  db.addSystemLog('info', `[API Detail] Fetching from ${apiSite.name}`, {
+    detailUrl,
+  }).catch(() => {});
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -232,6 +254,9 @@ export async function getDetailFromApi(
   clearTimeout(timeoutId);
 
   if (!response.ok) {
+    db.addSystemLog('warn', `[API Detail] Failed for ${apiSite.name}`, {
+      status: response.status,
+    }).catch(() => {});
     throw new Error(`详情请求失败: ${response.status}`);
   }
 
@@ -280,6 +305,12 @@ export async function getDetailFromApi(
     const matches = videoDetail.vod_content.match(M3U8_PATTERN) || [];
     episodes = matches.map((link: string) => link.replace(/^\$/, ''));
   }
+
+  db.addSystemLog('info', `[API Detail] Parsing Success for ${apiSite.name}`, {
+    episodesCount: episodes.length,
+    firstEpisodeUrl:
+      episodes.length > 0 ? episodes[0].substring(0, 100) : 'none',
+  }).catch(() => {});
 
   return {
     id: id.toString(),

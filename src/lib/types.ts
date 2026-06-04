@@ -79,6 +79,24 @@ export interface IStorage {
   ): Promise<void>;
   deleteSkipConfig(userName: string, source: string, id: string): Promise<void>;
   getAllSkipConfigs(userName: string): Promise<{ [key: string]: SkipConfig }>;
+
+  // 系统日志相关
+  addSystemLog(
+    level: string,
+    message: string,
+    details?: unknown
+  ): Promise<void>;
+  getSystemLogs(): Promise<SystemLog[]>;
+  clearSystemLogs(): Promise<void>;
+}
+
+// 系统日志数据结构
+export interface SystemLog {
+  id: string;
+  time: number;
+  level: string;
+  message: string;
+  details?: unknown;
 }
 
 // 搜索结果数据结构

@@ -25,7 +25,10 @@ import {
   ChevronDown,
   ChevronUp,
   FolderOpen,
+  RefreshCw,
+  ScrollText,
   Settings,
+  Trash2,
   Users,
   Video,
 } from 'lucide-react';
@@ -1686,6 +1689,199 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
   );
 };
 
+// 系统日志查看器组件
+const SystemLogsViewer = () => {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const res = await fetch('/api/admin/logs');
+      if (!res.ok) throw new Error(`获取失败: ${res.status}`);
+      const data = await res.json();
+      setLogs(data.logs || []);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : '获取日志失败');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
+  const clearLogs = async () => {
+    const { isConfirmed } = await Swal.fire({
+      title: '确认清空日志',
+      text: '此操作将清空所有系统日志，不可恢复。',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '确认清空',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!isConfirmed) return;
+    try {
+      const res = await fetch('/api/admin/logs', { method: 'DELETE' });
+      if (!res.ok) throw new Error(`清空失败: ${res.status}`);
+      setLogs([]);
+      showSuccess('日志已清空');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : '清空日志失败');
+    }
+  };
+
+  // 首次展开时加载
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  // 自动刷新（每10秒）
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = setInterval(() => fetchLogs(), 10000);
+    return () => clearInterval(timer);
+  }, [autoRefresh, fetchLogs]);
+
+  const levelStyle = (level: string) => {
+    switch (level) {
+      case 'error':
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+      case 'warn':
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300';
+      case 'info':
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
+      default:
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+    }
+  };
+
+  return (
+    <div className='space-y-4'>
+      {/* 工具栏 */}
+      <div className='flex items-center justify-between flex-wrap gap-2'>
+        <div className='flex items-center gap-2'>
+          <button
+            onClick={fetchLogs}
+            disabled={logsLoading}
+            className='inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors'
+          >
+            <RefreshCw
+              size={14}
+              className={logsLoading ? 'animate-spin' : ''}
+            />
+            {logsLoading ? '加载中…' : '刷新'}
+          </button>
+          <button
+            onClick={() => setAutoRefresh((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              autoRefresh
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            {autoRefresh ? '⏸ 停止自动刷新' : '▶ 自动刷新 (10s)'}
+          </button>
+        </div>
+        <button
+          onClick={clearLogs}
+          disabled={logs.length === 0}
+          className='inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-40 text-red-800 dark:text-red-300 text-sm rounded-lg transition-colors'
+        >
+          <Trash2 size={14} />
+          清空日志
+        </button>
+      </div>
+
+      {/* 日志统计 */}
+      <div className='flex gap-3 text-xs flex-wrap'>
+        {(['error', 'warn', 'info'] as const).map((lvl) => {
+          const count = logs.filter((l) => l.level === lvl).length;
+          return (
+            <span
+              key={lvl}
+              className={`px-2 py-1 rounded-full font-medium ${levelStyle(
+                lvl
+              )}`}
+            >
+              {lvl.toUpperCase()}: {count}
+            </span>
+          );
+        })}
+        <span className='px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium'>
+          共 {logs.length} 条
+        </span>
+      </div>
+
+      {/* 日志表格 */}
+      <div className='border border-gray-200 dark:border-gray-700 rounded-lg max-h-[36rem] overflow-y-auto overflow-x-auto'>
+        {logs.length === 0 ? (
+          <div className='py-12 text-center text-gray-400 dark:text-gray-500 text-sm'>
+            {logsLoading ? '加载中…' : '暂无日志'}
+          </div>
+        ) : (
+          <table className='min-w-full text-xs'>
+            <thead className='bg-gray-50 dark:bg-gray-900 sticky top-0'>
+              <tr>
+                <th className='px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap'>
+                  时间
+                </th>
+                <th className='px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                  级别
+                </th>
+                <th className='px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                  消息
+                </th>
+                <th className='px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'>
+                  详情
+                </th>
+              </tr>
+            </thead>
+            <tbody className='divide-y divide-gray-200 dark:divide-gray-700'>
+              {logs.map((log, idx) => (
+                <tr
+                  key={log.id || idx}
+                  className='hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'
+                >
+                  <td className='px-4 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400 font-mono'>
+                    {log.time
+                      ? new Date(log.time * 1000).toLocaleString('zh-CN', {
+                          hour12: false,
+                        })
+                      : '-'}
+                  </td>
+                  <td className='px-4 py-2.5 whitespace-nowrap'>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-xs font-semibold uppercase ${levelStyle(
+                        log.level
+                      )}`}
+                    >
+                      {log.level || 'log'}
+                    </span>
+                  </td>
+                  <td className='px-4 py-2.5 text-gray-900 dark:text-gray-100 max-w-[20rem] break-words'>
+                    {log.message}
+                  </td>
+                  <td className='px-4 py-2.5 text-gray-500 dark:text-gray-400 max-w-[24rem]'>
+                    {log.details ? (
+                      <pre className='text-xs whitespace-pre-wrap break-all font-mono bg-gray-50 dark:bg-gray-900 rounded p-1'>
+                        {typeof log.details === 'string'
+                          ? log.details
+                          : JSON.stringify(log.details, null, 2)}
+                      </pre>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function AdminPageClient() {
   const [config, setConfig] = useState<AdminConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1696,6 +1892,7 @@ function AdminPageClient() {
     videoSource: false,
     siteConfig: false,
     categoryConfig: false,
+    systemLogs: false,
   });
 
   // 获取管理员配置
@@ -1866,6 +2063,21 @@ function AdminPageClient() {
               onToggle={() => toggleTab('categoryConfig')}
             >
               <CategoryConfig config={config} refreshConfig={fetchConfig} />
+            </CollapsibleTab>
+
+            {/* 系统日志标签 */}
+            <CollapsibleTab
+              title='系统日志'
+              icon={
+                <ScrollText
+                  size={20}
+                  className='text-gray-600 dark:text-gray-400'
+                />
+              }
+              isExpanded={expandedTabs.systemLogs}
+              onToggle={() => toggleTab('systemLogs')}
+            >
+              {expandedTabs.systemLogs && <SystemLogsViewer />}
             </CollapsibleTab>
           </div>
         </div>

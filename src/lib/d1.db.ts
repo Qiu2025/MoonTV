@@ -584,4 +584,54 @@ export class D1Storage implements IStorage {
       throw err;
     }
   }
+
+  // --- 系统日志 ---
+  async addSystemLog(
+    level: string,
+    message: string,
+    details?: any
+  ): Promise<void> {
+    try {
+      const db = await this.getDatabase();
+      const detailsStr = details ? JSON.stringify(details) : null;
+      await db
+        .prepare(
+          'INSERT INTO system_logs (level, message, details, created_at) VALUES (?, ?, ?, strftime("%s", "now"))'
+        )
+        .bind(level, message, detailsStr)
+        .run();
+    } catch (err) {
+      console.error('Failed to add system log:', err);
+    }
+  }
+
+  async getSystemLogs(): Promise<any[]> {
+    try {
+      const db = await this.getDatabase();
+      const result = await db
+        .prepare(
+          'SELECT id, level, message, details, created_at as time FROM system_logs ORDER BY created_at DESC LIMIT 100'
+        )
+        .all<any>();
+      return result.results.map((row) => ({
+        id: row.id.toString(),
+        time: row.time,
+        level: row.level,
+        message: row.message,
+        details: row.details ? JSON.parse(row.details) : undefined,
+      }));
+    } catch (err) {
+      console.error('Failed to get system logs:', err);
+      return [];
+    }
+  }
+
+  async clearSystemLogs(): Promise<void> {
+    try {
+      const db = await this.getDatabase();
+      await db.prepare('DELETE FROM system_logs').run();
+    } catch (err) {
+      console.error('Failed to clear system logs:', err);
+    }
+  }
 }
