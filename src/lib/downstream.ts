@@ -49,6 +49,17 @@ export async function searchFromApi(
     ) {
       return [];
     }
+
+    // 替换 dytt 播放源地址
+    data.list.forEach((item: ApiSearchItem) => {
+      if (item.vod_play_url) {
+        item.vod_play_url = item.vod_play_url.replace(
+          /vip\.dytt-watch\.com/g,
+          'vip.dytt-broadcast.com'
+        );
+      }
+    });
+
     // 处理第一页结果
     const results = data.list.map((item: ApiSearchItem) => {
       let episodes: string[] = [];
@@ -130,6 +141,16 @@ export async function searchFromApi(
 
             if (!pageData || !pageData.list || !Array.isArray(pageData.list))
               return [];
+
+            // 替换 dytt 播放源地址
+            pageData.list.forEach((item: ApiSearchItem) => {
+              if (item.vod_play_url) {
+                item.vod_play_url = item.vod_play_url.replace(
+                  /vip\.dytt-watch\.com/g,
+                  'vip.dytt-broadcast.com'
+                );
+              }
+            });
 
             return pageData.list.map((item: ApiSearchItem) => {
               let episodes: string[] = [];
@@ -227,6 +248,14 @@ export async function getDetailFromApi(
 
   const videoDetail = data.list[0];
   let episodes: string[] = [];
+
+  // 替换 dytt 播放源地址
+  if (videoDetail.vod_play_url) {
+    videoDetail.vod_play_url = videoDetail.vod_play_url.replace(
+      /vip\.dytt-watch\.com/g,
+      'vip.dytt-broadcast.com'
+    );
+  }
 
   // 处理播放源拆分
   if (videoDetail.vod_play_url) {
