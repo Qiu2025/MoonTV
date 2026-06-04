@@ -228,22 +228,31 @@ export class DbManager {
   async addSystemLog(
     level: string,
     message: string,
-    details?: any
+    details?: unknown
   ): Promise<void> {
-    if (typeof (this.storage as any).addSystemLog === 'function') {
+    if (
+      this.storage &&
+      typeof (this.storage as any).addSystemLog === 'function'
+    ) {
       await (this.storage as any).addSystemLog(level, message, details);
     }
   }
 
   async getSystemLogs(): Promise<any[]> {
-    if (typeof (this.storage as any).getSystemLogs === 'function') {
+    if (
+      this.storage &&
+      typeof (this.storage as any).getSystemLogs === 'function'
+    ) {
       return (this.storage as any).getSystemLogs();
     }
     return [];
   }
 
   async clearSystemLogs(): Promise<void> {
-    if (typeof (this.storage as any).clearSystemLogs === 'function') {
+    if (
+      this.storage &&
+      typeof (this.storage as any).clearSystemLogs === 'function'
+    ) {
       await (this.storage as any).clearSystemLogs();
     }
   }

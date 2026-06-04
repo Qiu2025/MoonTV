@@ -44,7 +44,15 @@ export async function GET(request: NextRequest) {
   try {
     const logs = await db.getSystemLogs();
     return NextResponse.json(
-      { logs },
+      {
+        logs,
+        _debug: {
+          storageType,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          hasStorage: !!(db as any).storage,
+          logsCount: logs.length,
+        },
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
