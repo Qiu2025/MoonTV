@@ -4,6 +4,15 @@ import { db } from '@/lib/db';
 import { SearchResult } from '@/lib/types';
 import { cleanHtmlTags } from '@/lib/utils';
 
+// DYTT video CDN domains are region-blocked; route them through our proxy
+const DYTT_PROXY_RE = /^https?:\/\/vip\.dytt-\w+\.com\//;
+function wrapDyttProxy(url: string): string {
+  if (DYTT_PROXY_RE.test(url)) {
+    return `/api/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 interface ApiSearchItem {
   vod_id: string;
   vod_name: string;
@@ -61,16 +70,6 @@ export async function searchFromApi(
       return [];
     }
 
-    // 替换 dytt 播放源地址
-    data.list.forEach((item: ApiSearchItem) => {
-      if (item.vod_play_url) {
-        item.vod_play_url = item.vod_play_url.replace(
-          /vip\.dytt-watch\.com/g,
-          'vip.dytt-broadcast.com'
-        );
-      }
-    });
-
     // 处理第一页结果
     const results = data.list.map((item: ApiSearchItem) => {
       let episodes: string[] = [];
@@ -94,6 +93,9 @@ export async function searchFromApi(
         const parenIndex = link.indexOf('(');
         return parenIndex > 0 ? link.substring(0, parenIndex) : link;
       });
+
+      // Route blocked DYTT CDN URLs through our proxy
+      episodes = episodes.map(wrapDyttProxy);
 
       return {
         id: item.vod_id.toString(),
@@ -274,24 +276,25 @@ export async function getDetailFromApi(
   const videoDetail = data.list[0];
   let episodes: string[] = [];
 
-  // 记录原始播放地址
-  const rawPlayUrl = videoDetail.vod_play_url || '';
-  db.addSystemLog('info', `[API Detail] Raw vod_play_url for ${apiSite.name}`, {
-    rawPlayUrl: rawPlayUrl.substring(0, 500),
-  }).catch(() => {});
-
-  // 替换 dytt 播放源地址
+  // 处理播放源拆分 — 优先选择含 m3u8 链接最多的源
   if (videoDetail.vod_play_url) {
-    videoDetail.vod_play_url = videoDetail.vod_play_url.replace(
-      /vip\.dytt-watch\.com/g,
-      'vip.dytt-broadcast.com'
-    );
-  }
-
-  // 处理播放源拆分
-  if (videoDetail.vod_play_url) {
+    const m3u8Regex = /\$(https?:\/\/[^"'\s]+?\.m3u8)/g;
     const playSources = videoDetail.vod_play_url.split('$$$');
-    if (playSources.length > 0) {
+
+    // 遍历所有源，取 m3u8 匹配最多的
+    playSources.forEach((src: string) => {
+      const matches = src.match(m3u8Regex) || [];
+      if (matches.length > episodes.length) {
+        episodes = matches.map((link: string) => {
+          link = link.substring(1);
+          const pi = link.indexOf('(');
+          return pi > 0 ? link.substring(0, pi) : link;
+        });
+      }
+    });
+
+    // 如果没找到 m3u8，回退到第一个源的通用 URL 提取
+    if (episodes.length === 0) {
       const mainSource = playSources[0];
       const episodeList = mainSource.split('#');
       episodes = episodeList
@@ -312,10 +315,13 @@ export async function getDetailFromApi(
     episodes = matches.map((link: string) => link.replace(/^\$/, ''));
   }
 
+  // Route blocked DYTT CDN URLs through our proxy
+  episodes = episodes.map(wrapDyttProxy);
+
   db.addSystemLog('info', `[API Detail] Parsing Success for ${apiSite.name}`, {
     episodesCount: episodes.length,
-    allEpisodeUrls: episodes.slice(0, 5),
-    replacedPlayUrl: (videoDetail.vod_play_url || '').substring(0, 500),
+    firstEpisodeUrl:
+      episodes.length > 0 ? episodes[0].substring(0, 120) : 'none',
   }).catch(() => {});
 
   return {
