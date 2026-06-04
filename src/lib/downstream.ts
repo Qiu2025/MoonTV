@@ -274,6 +274,12 @@ export async function getDetailFromApi(
   const videoDetail = data.list[0];
   let episodes: string[] = [];
 
+  // 记录原始播放地址
+  const rawPlayUrl = videoDetail.vod_play_url || '';
+  db.addSystemLog('info', `[API Detail] Raw vod_play_url for ${apiSite.name}`, {
+    rawPlayUrl: rawPlayUrl.substring(0, 500),
+  }).catch(() => {});
+
   // 替换 dytt 播放源地址
   if (videoDetail.vod_play_url) {
     videoDetail.vod_play_url = videoDetail.vod_play_url.replace(
@@ -308,8 +314,8 @@ export async function getDetailFromApi(
 
   db.addSystemLog('info', `[API Detail] Parsing Success for ${apiSite.name}`, {
     episodesCount: episodes.length,
-    firstEpisodeUrl:
-      episodes.length > 0 ? episodes[0].substring(0, 100) : 'none',
+    allEpisodeUrls: episodes.slice(0, 5),
+    replacedPlayUrl: (videoDetail.vod_play_url || '').substring(0, 500),
   }).catch(() => {});
 
   return {
