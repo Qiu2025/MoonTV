@@ -1228,6 +1228,7 @@ function PlayPageClient() {
       artPlayerRef.current = new Artplayer({
         container: artRef.current,
         url: videoUrl,
+        type: 'm3u8', // Force HLS.js — proxy URLs don't end with .m3u8
         poster: videoCover,
         volume: 0.7,
         isLive: false,

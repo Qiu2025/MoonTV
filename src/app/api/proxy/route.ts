@@ -4,12 +4,22 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-/** Only allow proxying to DYTT video CDN domains (vip.dytt-*.com) */
-const DYTT_DOMAIN_RE = /^vip\.dytt-\w+\.com$/;
-
+/** Block proxying to our own origin and private IPs to prevent SSRF */
 function isAllowed(url: string): boolean {
   try {
-    return DYTT_DOMAIN_RE.test(new URL(url).hostname);
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    // Block localhost, private IPs, and our own domain
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      host.endsWith('.local')
+    ) {
+      return false;
+    }
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }

@@ -4,10 +4,9 @@ import { db } from '@/lib/db';
 import { SearchResult } from '@/lib/types';
 import { cleanHtmlTags } from '@/lib/utils';
 
-// DYTT video CDN domains are region-blocked; route them through our proxy
-const DYTT_PROXY_RE = /^https?:\/\/vip\.dytt-\w+\.com\//;
-function wrapDyttProxy(url: string): string {
-  if (DYTT_PROXY_RE.test(url)) {
+// Route all video CDN URLs through our proxy to avoid CORS issues
+function wrapVideoProxy(url: string): string {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
     return `/api/proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
@@ -95,7 +94,7 @@ export async function searchFromApi(
       });
 
       // Route blocked DYTT CDN URLs through our proxy
-      episodes = episodes.map(wrapDyttProxy);
+      episodes = episodes.map(wrapVideoProxy);
 
       return {
         id: item.vod_id.toString(),
@@ -316,7 +315,7 @@ export async function getDetailFromApi(
   }
 
   // Route blocked DYTT CDN URLs through our proxy
-  episodes = episodes.map(wrapDyttProxy);
+  episodes = episodes.map(wrapVideoProxy);
 
   db.addSystemLog('info', `[API Detail] Parsing Success for ${apiSite.name}`, {
     episodesCount: episodes.length,
