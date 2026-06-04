@@ -42,22 +42,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 直接写一条测试日志，绕过缓存，验证 D1 写入是否正常
-    await db.addSystemLog('info', '[Test] Direct write from logs API', {
-      ts: Date.now(),
-    });
-
     const logs = await db.getSystemLogs();
     return NextResponse.json(
-      {
-        logs,
-        _debug: {
-          storageType,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          hasStorage: !!(db as any).storage,
-          logsCount: logs.length,
-        },
-      },
+      { logs },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
